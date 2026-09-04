@@ -16,7 +16,7 @@ const Config = (() => {
 
   // Configurações padrão embutidas para distribuição (.exe)
   const DEFAULT_CONFIG = {
-    ENDPOINT: 'https://script.google.com/macros/s/AKfycbxzWXmKvVZ7ha-0bfjNLGdLu6XC96m9PpXGEO_U__e-7NhdupZ948qrWNog7H2Z2TdH/exec',
+    ENDPOINT: 'https://script.google.com/macros/s/AKfycbxxinN2x0G2DbXqyay3PJICJpTsoFJkHEw_Xd0HStLkwEp4CVLntGbaxZjLgFvCXnA/exec',
     TOKEN: 'Llamenina2026SafeTokenFichas!',
     PUBLIC_URL: 'https://llamenina-st.github.io/llamenina-fichas/resources/fotos.html'
   };
@@ -34,8 +34,15 @@ const Config = (() => {
       _endpointUrl = localStorage.getItem(STORAGE_KEYS.ENDPOINT) || DEFAULT_CONFIG.ENDPOINT || '';
       _apiToken = localStorage.getItem(STORAGE_KEYS.TOKEN) || DEFAULT_CONFIG.TOKEN || '';
       _publicUrl = localStorage.getItem(STORAGE_KEYS.PUBLIC_URL) || DEFAULT_CONFIG.PUBLIC_URL || '';
-      if (_publicUrl.includes('127.0.0.1') || _publicUrl.includes('localhost') || _publicUrl.startsWith('file:')) {
+      
+      // Migração automática se houver referências antigas no localStorage
+      if (!_endpointUrl || _endpointUrl.includes('AKfycbxzWXmKvVZ7ha')) {
+        _endpointUrl = DEFAULT_CONFIG.ENDPOINT;
+        localStorage.setItem(STORAGE_KEYS.ENDPOINT, _endpointUrl);
+      }
+      if (_publicUrl.includes('127.0.0.1') || _publicUrl.includes('localhost') || _publicUrl.startsWith('file:') || _publicUrl.includes('eduardo-nn.github.io')) {
         _publicUrl = DEFAULT_CONFIG.PUBLIC_URL;
+        localStorage.setItem(STORAGE_KEYS.PUBLIC_URL, _publicUrl);
       }
     } catch (e) {
       console.warn('[Config] Não foi possível acessar localStorage:', e.message);

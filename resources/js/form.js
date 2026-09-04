@@ -26,14 +26,17 @@ const FichaForm = (() => {
   const FIELDS = {
     // Cabeçalho / Identificação
     modelo: 'field-modelo',
-    referencia: 'field-referencia',
-    op: 'field-op',
-    modelista: 'field-modelista',
     pilotista: 'field-pilotista',
-    tecido: 'field-tecido',
-    coresTecido: 'field-tecido-cores',
-    composicao: 'field-composicao',
+    referencia: 'field-referencia',
+    modelista: 'field-modelista',
+    op: 'field-op',
     corLinha: 'field-cor-linha',
+    tecido: 'field-tecido',
+    composicao: 'field-composicao',
+    coresTecido: 'field-tecido-cores',
+    grade: 'field-grade',
+    quantCorte: 'field-quant-corte',
+    enfesto: 'field-enfesto',
     // Observações
     obsCostura: 'field-obs-costura',
     // Aprovação
@@ -49,9 +52,9 @@ const FichaForm = (() => {
    */
   function getFichaPublicQRUrl(fichaId) {
     if (!fichaId) return '';
-    let baseUrl = Config.getPublicUrl() || 'https://eduardo-nn.github.io/llamenina-fichas/resources/fotos.html';
+    let baseUrl = Config.getPublicUrl() || 'https://llamenina-st.github.io/llamenina-fichas/resources/fotos.html';
     if (baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost') || baseUrl.startsWith('file:')) {
-      baseUrl = 'https://eduardo-nn.github.io/llamenina-fichas/resources/fotos.html';
+      baseUrl = 'https://llamenina-st.github.io/llamenina-fichas/resources/fotos.html';
     }
     baseUrl = baseUrl.replace(/index\.html$/, 'fotos.html');
     if (!baseUrl.endsWith('fotos.html')) {
@@ -67,9 +70,9 @@ const FichaForm = (() => {
    */
   function getFichaPublicFeedbackQRUrl(fichaId) {
     if (!fichaId) return '';
-    let baseUrl = Config.getPublicFeedbackUrl() || 'https://eduardo-nn.github.io/llamenina-fichas/resources/feedback.html';
+    let baseUrl = Config.getPublicFeedbackUrl() || 'https://llamenina-st.github.io/llamenina-fichas/resources/feedback.html';
     if (baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost') || baseUrl.startsWith('file:')) {
-      baseUrl = 'https://eduardo-nn.github.io/llamenina-fichas/resources/feedback.html';
+      baseUrl = 'https://llamenina-st.github.io/llamenina-fichas/resources/feedback.html';
     }
     return baseUrl + '?id=' + encodeURIComponent(fichaId);
   }

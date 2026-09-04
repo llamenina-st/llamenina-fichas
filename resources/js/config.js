@@ -18,7 +18,7 @@ const Config = (() => {
   const DEFAULT_CONFIG = {
     ENDPOINT: 'https://script.google.com/macros/s/AKfycbxzWXmKvVZ7ha-0bfjNLGdLu6XC96m9PpXGEO_U__e-7NhdupZ948qrWNog7H2Z2TdH/exec',
     TOKEN: 'Llamenina2026SafeTokenFichas!',
-    PUBLIC_URL: 'https://eduardo-nn.github.io/llamenina-fichas/resources/fotos.html'
+    PUBLIC_URL: 'https://llamenina-st.github.io/llamenina-fichas/resources/fotos.html'
   };
 
   // Valores em memória (nunca persistidos em localStorage)

@@ -63,9 +63,12 @@ const COLUMNS = {
   DATA_APROVACAO: 31,
   ATIVO: 32,
   CORES_TECIDO: 33,
+  GRADE: 34,
+  QUANT_CORTE: 35,
+  ENFESTO: 36,
 };
 
-const TOTAL_COLUMNS = 33;
+const TOTAL_COLUMNS = 36;
 
 // ═══════════════ COLUNAS DA PLANILHA (FEEDBACKS) ═══════════════
 
@@ -361,7 +364,12 @@ function handleSearch(query) {
         row[COLUMNS.REFERENCIA - 1],
         row[COLUMNS.OP - 1],
         row[COLUMNS.MODELISTA - 1],
-        row[COLUMNS.TECIDO - 1]
+        row[COLUMNS.PILOTISTA - 1],
+        row[COLUMNS.TECIDO - 1],
+        (row.length >= 33 ? row[COLUMNS.CORES_TECIDO - 1] : ''),
+        (row.length >= 34 ? row[COLUMNS.GRADE - 1] : ''),
+        (row.length >= 35 ? row[COLUMNS.QUANT_CORTE - 1] : ''),
+        (row.length >= 36 ? row[COLUMNS.ENFESTO - 1] : '')
       ].join(' ').toLowerCase();
       return searchable.indexOf(q) !== -1;
     })
@@ -597,7 +605,10 @@ function buildRow(id, createdAt, updatedAt, ficha) {
     s(ficha.responsavelAprovacao || ''),
     s(ficha.dataAprovacao || ''),
     'TRUE',
-    s(ficha.coresTecido || '')
+    s(ficha.coresTecido || ''),
+    s(ficha.grade || ''),
+    s(ficha.quantCorte || ''),
+    s(ficha.enfesto || '')
   ];
 }
 
@@ -639,6 +650,9 @@ function rowToObject(row) {
     responsavelAprovacao: row[COLUMNS.RESPONSAVEL - 1],
     dataAprovacao: row[COLUMNS.DATA_APROVACAO - 1],
     coresTecido: (row.length >= 33 && row[COLUMNS.CORES_TECIDO - 1] !== undefined) ? row[COLUMNS.CORES_TECIDO - 1] : '',
+    grade: (row.length >= 34 && row[COLUMNS.GRADE - 1] !== undefined) ? row[COLUMNS.GRADE - 1] : '',
+    quantCorte: (row.length >= 35 && row[COLUMNS.QUANT_CORTE - 1] !== undefined) ? row[COLUMNS.QUANT_CORTE - 1] : '',
+    enfesto: (row.length >= 36 && row[COLUMNS.ENFESTO - 1] !== undefined) ? row[COLUMNS.ENFESTO - 1] : '',
   };
 }
 
@@ -735,7 +749,7 @@ function getOrCreateSheet(name) {
         'Medidas PMG (JSON)', 'Título Medidas Num', 'Medidas Num (JSON)',
         'Obs Costura', 'Combinações Cores (JSON)', 'QR Corte URL',
         'QR Anexos URL', 'QR Feedback URL', 'Status', 'Responsável',
-        'Data Aprovação', 'Ativo', 'Cores Tecido'
+        'Data Aprovação', 'Ativo', 'Cores Tecido', 'Grade', 'Quant Corte', 'Enfesto'
       ];
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');

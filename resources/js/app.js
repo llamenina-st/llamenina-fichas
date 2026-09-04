@@ -818,7 +818,8 @@ const App = (() => {
     const localResults = fichasCache.filter(ficha => {
       const searchStr = [
         ficha.modelo, ficha.referencia, ficha.op,
-        ficha.modelista, ficha.tecido
+        ficha.modelista, ficha.pilotista, ficha.tecido,
+        ficha.grade, ficha.quantCorte, ficha.enfesto, ficha.coresTecido
       ].join(' ').toLowerCase();
       return searchStr.includes(query.toLowerCase());
     });

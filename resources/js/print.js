@@ -107,10 +107,24 @@ const PrintModule = (() => {
                   <span class="print-field__value">${s(data.composicao || '—')}</span>
                 </div>
 
-                <!-- Linha 5: Cores (Abaixo de Tecido) -->
-                <div class="print-field print-field--full">
+                <!-- Linha 5: Cores do Tecido / Grade -->
+                <div class="print-field">
                   <span class="print-field__label">Cores do Tecido:</span>
                   <span class="print-field__value">${s(data.coresTecido || '—')}</span>
+                </div>
+                <div class="print-field">
+                  <span class="print-field__label">Grade:</span>
+                  <span class="print-field__value">${s(data.grade || '—')}</span>
+                </div>
+
+                <!-- Linha 6: Quant. Corte / Enfesto -->
+                <div class="print-field">
+                  <span class="print-field__label">Quant. Corte:</span>
+                  <span class="print-field__value">${s(data.quantCorte || '—')}</span>
+                </div>
+                <div class="print-field">
+                  <span class="print-field__label">Enfesto:</span>
+                  <span class="print-field__value">${s(data.enfesto || '—')}</span>
                 </div>
               </div>
             </div>

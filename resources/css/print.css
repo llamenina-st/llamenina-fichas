@@ -269,11 +269,10 @@
   }
 
   .print-field {
-    display: flex;
-    gap: 1mm;
+    display: block;
     padding: 0.3mm 0;
     border-bottom: 0.5pt dotted #ccc;
-    align-items: baseline;
+    line-height: 1.25;
   }
 
   .print-field__label {
@@ -281,13 +280,14 @@
     white-space: nowrap;
     color: #222;
     font-size: 6.8pt;
-    min-width: fit-content;
+    display: inline;
+    margin-right: 0.8mm;
   }
 
   .print-field__value {
-    flex: 1;
     word-break: break-word;
     font-size: 7.2pt;
+    display: inline;
   }
 
   .print-field--full {

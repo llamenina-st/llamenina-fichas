@@ -236,7 +236,7 @@ const FichaForm = (() => {
     for (const [key, elementId] of Object.entries(FIELDS)) {
       const el = document.getElementById(elementId);
       if (el && data[key] !== undefined) {
-        el.value = Security.sanitizeHTML(String(data[key]));
+        el.value = String(data[key]);
       }
     }
 
@@ -265,7 +265,7 @@ const FichaForm = (() => {
     // Tabela P/M/G
     if (data.medidasPMGTitulo) {
       const titleEl = document.getElementById('measure-title-pmg');
-      if (titleEl) titleEl.value = Security.sanitizeHTML(data.medidasPMGTitulo);
+      if (titleEl) titleEl.value = data.medidasPMGTitulo;
     }
     if (data.medidasPMG && Array.isArray(data.medidasPMG)) {
       fillMeasureTable('measure-table-pmg', data.medidasPMG);
@@ -274,7 +274,7 @@ const FichaForm = (() => {
     // Tabela Numeração
     if (data.medidasNumeracaoTitulo) {
       const titleEl = document.getElementById('measure-title-num');
-      if (titleEl) titleEl.value = Security.sanitizeHTML(data.medidasNumeracaoTitulo);
+      if (titleEl) titleEl.value = data.medidasNumeracaoTitulo;
     }
     if (data.medidasNumeracao && Array.isArray(data.medidasNumeracao)) {
       fillMeasureTable('measure-table-num', data.medidasNumeracao);
@@ -346,7 +346,7 @@ const FichaForm = (() => {
     descInput.type = 'text';
     descInput.className = 'form-input';
     descInput.placeholder = 'Ex.: Comprimento';
-    descInput.value = Security.sanitizeHTML(desc);
+    descInput.value = desc;
     descCell.appendChild(descInput);
     row.appendChild(descCell);
 
@@ -357,7 +357,7 @@ const FichaForm = (() => {
       input.type = 'text';
       input.className = 'form-input';
       input.placeholder = '—';
-      input.value = values[header] ? Security.sanitizeHTML(String(values[header])) : '';
+      input.value = values[header] ? String(values[header]) : '';
       cell.appendChild(input);
       row.appendChild(cell);
     });
@@ -393,13 +393,16 @@ const FichaForm = (() => {
     const row = document.createElement('div');
     row.className = 'color-combo-row';
     row.innerHTML = `
-      <input type="text" class="form-input" placeholder="Cor da Peça" value="${Security.sanitizeHTML(peca)}">
+      <input type="text" class="form-input color-combo-peca" placeholder="Cor / Tecido 1">
       <span class="color-combo-row__separator">→</span>
-      <input type="text" class="form-input" placeholder="Cor do Bordado" value="${Security.sanitizeHTML(bordado)}">
+      <input type="text" class="form-input color-combo-bordado" placeholder="Cor / Tecido 2">
       <button type="button" class="btn btn--ghost btn--icon color-combo-remove" data-tooltip="Remover">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     `;
+
+    row.querySelector('.color-combo-peca').value = peca;
+    row.querySelector('.color-combo-bordado').value = bordado;
 
     // Event listener para remover
     row.querySelector('.color-combo-remove').addEventListener('click', () => {
@@ -430,16 +433,17 @@ const FichaForm = (() => {
           <button type="button" class="flow-step-btn btn-step-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Mover para cima">▲</button>
           <button type="button" class="flow-step-btn btn-step-down" data-index="${index}" ${index === currentFlowSteps.length - 1 ? 'disabled' : ''} title="Mover para baixo">▼</button>
         </div>
-        <input type="text" list="flow-step-presets" class="form-input flow-step-name-input" placeholder="Nome da Etapa" value="${Security.sanitizeHTML(step.etapa)}">
-        <input type="text" class="form-input flow-step-value-input" placeholder="Fornecedor / Local / Observações" value="${Security.sanitizeHTML(step.valor)}">
+        <input type="text" list="flow-step-presets" class="form-input flow-step-name-input" placeholder="Nome da Etapa">
+        <input type="text" class="form-input flow-step-value-input" placeholder="Fornecedor / Local / Observações">
         <button type="button" class="btn btn--ghost btn--icon flow-step-remove" data-index="${index}" title="Remover Etapa">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       `;
 
-      // Eventos de digitação nos inputs
       const nameInput = row.querySelector('.flow-step-name-input');
       const valInput = row.querySelector('.flow-step-value-input');
+      nameInput.value = step.etapa || '';
+      valInput.value = step.valor || '';
 
       nameInput.addEventListener('input', () => {
         currentFlowSteps[index].etapa = nameInput.value;
@@ -876,14 +880,15 @@ const FichaForm = (() => {
 
       const reader = new FileReader();
       reader.onload = function(e) {
-        // Enviar foto na qualidade original (armazenamento via Google Drive)
-        currentFotos.push(e.target.result);
-        loadedCount++;
+        compressImage(e.target.result, 1200, 0.85, function(compressedData) {
+          currentFotos.push(compressedData);
+          loadedCount++;
 
-        if (loadedCount === filesToProcess.length) {
-          renderPhotosPreviews();
-          triggerAutoSave();
-        }
+          if (loadedCount === filesToProcess.length) {
+            renderPhotosPreviews();
+            triggerAutoSave();
+          }
+        });
       };
       reader.onerror = function() {
         alert(`Falha ao processar o arquivo "${file.name}". Certifique-se de que é uma imagem válida.`);
@@ -895,6 +900,39 @@ const FichaForm = (() => {
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  /**
+   * Redimensiona e comprime uma imagem base64
+   */
+  function compressImage(base64Str, maxDim, quality, callback) {
+    if (typeof base64Str !== 'string' || !base64Str.startsWith('data:image')) {
+      return callback(base64Str);
+    }
+    const img = new Image();
+    img.onload = function() {
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      callback(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function() {
+      callback(base64Str);
+    };
+    img.src = base64Str;
   }
 
   /**

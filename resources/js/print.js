@@ -180,10 +180,10 @@ const PrintModule = (() => {
           <!-- ═══ COMBINAÇÕES DE CORES ═══ -->
           ${data.combinacoesCores && data.combinacoesCores.length > 0 ? `
           <div class="print-section print-no-break">
-            <div class="print-section__title">Bordado / Silk — Combinação de Cores</div>
+            <div class="print-section__title">Combinação de Cores</div>
             <div class="print-combos">
               ${data.combinacoesCores.map(c =>
-                `<span class="print-combo"><span class="print-combo-label">Peça:</span> ${s(c.peca || '—')} → <span class="print-combo-label">Bordado:</span> ${s(c.bordado || '—')}</span>`
+                `<span class="print-combo">${s(c.peca || '—')} &nbsp;→&nbsp; ${s(c.bordado || '—')}</span>`
               ).join('')}
             </div>
           </div>

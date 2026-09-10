@@ -13,7 +13,7 @@ const App = (() => {
   let activeFeedbackFilter = 'todos'; // 'todos' | 'novo' | 'em_analise' | 'resolvido'
 
   // ── Versão do aplicativo (atualizar aqui a cada release) ──
-  const APP_VERSION = 'v1.4.0';
+  const APP_VERSION = 'v1.5.0';
 
   /**
    * Inicializa a aplicação
@@ -330,11 +330,15 @@ const App = (() => {
    */
   async function loadFichaForEdit(fichaId) {
     try {
-      let ficha = fichasCache.find(f => f.id === fichaId);
-
-      if (!ficha) {
+      // Sempre buscar dados frescos do servidor para evitar cache stale
+      let ficha;
+      try {
         const result = await API.getFicha(fichaId);
         ficha = result.ficha;
+      } catch (err) {
+        // Fallback para cache se o servidor falhar
+        console.warn('[App] Falha ao buscar do servidor, usando cache:', err.message);
+        ficha = fichasCache.find(f => f.id === fichaId);
       }
 
       if (ficha) {
@@ -752,17 +756,38 @@ const App = (() => {
 
     try {
       const result = await API.saveFicha(data, isUpdate);
-      showToast(
-        'Ficha salva!',
-        `${data.modelo} — ${data.referencia}`,
-        'success'
-      );
+
+      // Verificar se alguma foto falhou no upload ao Drive
+      if (result.fotosFailedCount && result.fotosFailedCount > 0) {
+        const errDetail = result.fotosLastError ? ` (Motivo: ${result.fotosLastError})` : '';
+        showToast(
+          'Ficha salva com aviso',
+          `${result.fotosFailedCount} foto(s) não puderam ser enviadas ao Drive${errDetail}. Os demais dados foram salvos e suas fotos continuam no formulário.`,
+          'warning',
+          10000
+        );
+      } else {
+        showToast(
+          'Ficha salva!',
+          `${data.modelo} — ${data.referencia}`,
+          'success'
+        );
+      }
       Config.clearDraft();
 
       if (result.id) {
         try {
           const getResult = await API.getFicha(result.id);
           if (getResult && getResult.ficha) {
+            if (data.combinacoesCores && data.combinacoesCores.length > 0 && (!getResult.ficha.combinacoesCores || getResult.ficha.combinacoesCores.length === 0)) {
+              getResult.ficha.combinacoesCores = data.combinacoesCores;
+            }
+            // Preservar fotos locais no formulário se o servidor retornou vazio mas o formulário continha fotos
+            const serverFotos = getResult.ficha.foto;
+            const hasServerFotos = serverFotos && serverFotos !== '[]' && serverFotos !== '""' && serverFotos !== 'null';
+            if (!hasServerFotos && data.foto && data.foto !== '[]') {
+              getResult.ficha.foto = data.foto;
+            }
             FichaForm.fillForm(getResult.ficha);
           }
         } catch (err) {

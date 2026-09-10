@@ -173,7 +173,11 @@ const Config = (() => {
    */
   function saveDraft(data) {
     try {
-      const json = JSON.stringify(data);
+      // Excluir fotos do rascunho para evitar estouro do sessionStorage (~5MB)
+      // Fotos base64 podem facilmente atingir 1-5MB e não são recuperáveis no draft
+      const draftData = Object.assign({}, data);
+      delete draftData.foto;
+      const json = JSON.stringify(draftData);
       sessionStorage.setItem(STORAGE_KEYS.DRAFT, json);
     } catch (e) {
       console.warn('[Config] Falha ao salvar rascunho:', e.message);

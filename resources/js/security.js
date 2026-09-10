@@ -13,11 +13,10 @@ const Security = (() => {
     '>': '&gt;',
     '"': '&quot;',
     "'": '&#x27;',
-    '/': '&#x2F;',
     '`': '&#96;'
   };
 
-  const ENTITY_REGEX = /[&<>"'`/]/g;
+  const ENTITY_REGEX = /[&<>"'`]/g;
 
   /**
    * Escapa caracteres HTML perigosos para prevenir XSS

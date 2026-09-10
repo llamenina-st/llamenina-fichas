@@ -993,19 +993,24 @@
 }
 
 .preview-frame .print-field {
-  display: flex;
-  gap: 1mm;
+  display: block;
   padding: 0.5mm 0;
   border-bottom: 0.5pt dotted #ccc;
+  line-height: 1.25;
 }
 
 .preview-frame .print-field__label {
   font-weight: bold;
   color: #333;
+  display: inline;
+  margin-right: 0.8mm;
+  white-space: nowrap;
 }
 
 .preview-frame .print-field__value {
   color: #000;
+  display: inline;
+  word-break: break-word;
 }
 
 .preview-frame .print-field--full {

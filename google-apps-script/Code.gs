@@ -116,7 +116,7 @@ function doPost(e) {
     // 2. Autenticação
     const token = data._token || '';
     if (!validateToken(token)) {
-      logAudit('AUTH_FAIL', '', 'Token inválido (POST)');
+
       return jsonResponse({ error: 'Token de autenticação inválido', code: 'AUTH_FAILED' });
     }
     
@@ -171,7 +171,7 @@ function doGet(e) {
     // Autenticação
     const token = params.token || '';
     if (!validateToken(token)) {
-      logAudit('AUTH_FAIL', '', 'Token inválido (GET)');
+
       return jsonResponse({ error: 'Token de autenticação inválido', code: 'AUTH_FAILED' });
     }
     
@@ -248,7 +248,9 @@ function handleCreate(ficha) {
   return jsonResponse({
     success: true,
     id: id,
-    message: 'Ficha criada com sucesso'
+    message: 'Ficha criada com sucesso',
+    fotosFailedCount: ficha._fotosFailedCount || 0,
+    fotosLastError: ficha._fotosLastError || null
   });
 }
 
@@ -281,7 +283,9 @@ function handleUpdate(ficha) {
   return jsonResponse({
     success: true,
     id: ficha.id,
-    message: 'Ficha atualizada com sucesso'
+    message: 'Ficha atualizada com sucesso',
+    fotosFailedCount: ficha._fotosFailedCount || 0,
+    fotosLastError: ficha._fotosLastError || null
   });
 }
 
@@ -332,7 +336,7 @@ function handleList() {
     })
     .map(rowToObject);
   
-  logAudit('READ', '', 'Listou ' + fichas.length + ' fichas');
+
   
   return jsonResponse({ fichas: fichas, total: fichas.length });
 }
@@ -375,7 +379,7 @@ function handleSearch(query) {
     })
     .map(rowToObject);
   
-  logAudit('SEARCH', '', 'Buscou "' + query + '": ' + fichas.length + ' resultados');
+
   
   return jsonResponse({ fichas: fichas, total: fichas.length });
 }
@@ -398,7 +402,7 @@ function handleGet(id) {
   const row = sheet.getRange(rowIndex, 1, 1, TOTAL_COLUMNS).getValues()[0];
   const ficha = rowToObject(row);
   
-  logAudit('READ', id, 'Ficha consultada');
+
   
   return jsonResponse({ ficha: ficha });
 }
@@ -572,6 +576,23 @@ function handleDeleteFeedback(feedbackId) {
  */
 function buildRow(id, createdAt, updatedAt, ficha) {
   const s = sanitize;
+  // Segurança: filtrar qualquer base64 residual que tenha escapado do upload ao Drive
+  // Após processAndUploadPhotos_, ficha.foto deve conter apenas URLs curtas do Drive
+  let fotoValue = ficha.foto || '';
+  if (typeof fotoValue === 'string' && fotoValue.length > 5000) {
+    try {
+      var fotosArr = JSON.parse(fotoValue);
+      if (Array.isArray(fotosArr)) {
+        // Manter apenas URLs (começam com http), remover qualquer base64 residual
+        fotosArr = fotosArr.filter(function(f) {
+          return typeof f === 'string' && f.startsWith('http');
+        });
+        fotoValue = JSON.stringify(fotosArr);
+      }
+    } catch(e) {
+      fotoValue = '[]';
+    }
+  }
   return [
     id,
     createdAt,
@@ -591,7 +612,7 @@ function buildRow(id, createdAt, updatedAt, ficha) {
     s(ficha.lacreLavanderia || ''),
     s(ficha.acabamento || ''),
     s(ficha.faseFinal || ''),
-    ficha.foto || '',
+    fotoValue,
     s(ficha.medidasPMGTitulo || ''),
     JSON.stringify(ficha.medidasPMG || []),
     s(ficha.medidasNumeracaoTitulo || ''),
@@ -725,7 +746,7 @@ function findRowById(sheet, id, colIndex) {
   
   const ids = sheet.getRange(2, colIndex, lastRow - 1, 1).getValues();
   for (let i = 0; i < ids.length; i++) {
-    if (ids[i][0] === id) return i + 2;
+    if (String(ids[i][0]).trim() === String(id).trim()) return i + 2;
   }
   return -1;
 }
@@ -849,8 +870,13 @@ function logAudit(action, fichaId, details) {
  */
 function processAndUploadPhotos_(ficha, fichaId) {
   if (!ficha.foto) return ficha;
-  const uploaded = uploadBase64PhotosList_(ficha.foto, fichaId, CONFIG.DRIVE_FOLDER_NAME, 'foto');
-  ficha.foto = JSON.stringify(uploaded);
+  var result = uploadBase64PhotosList_(ficha.foto, fichaId, CONFIG.DRIVE_FOLDER_NAME, 'foto');
+  ficha.foto = JSON.stringify(result.urls);
+  ficha._fotosFailedCount = result.failedCount;
+  ficha._fotosLastError = result.lastError || null;
+  if (result.failedCount > 0) {
+    logAudit('PHOTO_UPLOAD_PARTIAL', fichaId, result.failedCount + ' foto(s) falharam no upload ao Drive: ' + (result.lastError || ''));
+  }
   return ficha;
 }
 
@@ -859,71 +885,121 @@ function processAndUploadPhotos_(ficha, fichaId) {
  */
 function processAndUploadFeedbackPhotos_(feedback, feedbackId) {
   if (!feedback.fotos) return feedback;
-  const uploaded = uploadBase64PhotosList_(feedback.fotos, feedbackId, CONFIG.DRIVE_FOLDER_FEEDBACKS_NAME, 'defeito');
-  feedback.fotos = JSON.stringify(uploaded);
+  var result = uploadBase64PhotosList_(feedback.fotos, feedbackId, CONFIG.DRIVE_FOLDER_FEEDBACKS_NAME, 'defeito');
+  feedback.fotos = JSON.stringify(result.urls);
+  if (result.failedCount > 0) {
+    logAudit('PHOTO_UPLOAD_PARTIAL', feedbackId, result.failedCount + ' foto(s) de feedback falharam no upload ao Drive: ' + (result.lastError || ''));
+  }
   return feedback;
 }
 
 /**
- * Faz upload de uma lista de fotos base64 para uma pasta específica do Google Drive
+ * Faz upload de uma lista de fotos base64 para uma pasta específica do Google Drive.
+ * Retorna { urls: [...], failedCount: N, lastError: string } em vez de apenas o array.
+ * Quando o upload falha, retenta 1x. Se falhar de novo, descarta SÓ essa foto.
+ * NUNCA devolve base64 no array de URLs — isso causava estouro de célula.
  */
 function uploadBase64PhotosList_(photosRaw, idPrefix, folderName, fileTag) {
-  let fotos = [];
+  var fotos = [];
   try {
     fotos = typeof photosRaw === 'string' ? JSON.parse(photosRaw) : photosRaw;
   } catch (e) {
     if (typeof photosRaw === 'string' && photosRaw.startsWith('data:')) {
       fotos = [photosRaw];
     } else {
-      return [];
+      return { urls: [], failedCount: 0, lastError: null };
     }
   }
 
-  if (!Array.isArray(fotos) || fotos.length === 0) return [];
+  if (!Array.isArray(fotos) || fotos.length === 0) return { urls: [], failedCount: 0, lastError: null };
 
-  const folder = getOrCreateDriveFolder_(folderName);
-  const uploadedUrls = [];
+  var folder = getOrCreateDriveFolder_(folderName);
+  var uploadedUrls = [];
+  var failedCount = 0;
+  var lastUploadError = null;
 
   fotos.forEach(function(fotoItem, index) {
+    // Se já é URL (não base64), manter sem re-upload
     if (typeof fotoItem === 'string' && !fotoItem.startsWith('data:')) {
       uploadedUrls.push(fotoItem);
       return;
     }
 
+    // Extrair dados do base64 de forma robusta
+    var commaIdx = (typeof fotoItem === 'string') ? fotoItem.indexOf(',') : -1;
+    if (commaIdx === -1) {
+      Logger.log('Foto ' + (index + 1) + ' não contém dados base64 válidos, descartada.');
+      failedCount++;
+      lastUploadError = 'Formato base64 sem vírgula de cabeçalho';
+      return;
+    }
+
+    var base64Data = fotoItem.substring(commaIdx + 1).replace(/[\r\n\s]/g, '');
+    var mimeMatch = fotoItem.match(/^data:(image\/[a-zA-Z+]+);/);
+    var mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    var fileName = idPrefix + '_' + fileTag + '_' + (index + 1) + '.' + (mimeType === 'image/png' ? 'png' : 'jpg');
+
+    // Tentativa 1
+    var res = tryUploadToDrive_(folder, base64Data, mimeType, fileName);
+    if (res && res.url) {
+      uploadedUrls.push(res.url);
+      return;
+    }
+    var currentErr = (res && res.error) ? res.error : 'Falha desconhecida';
+
+    // Tentativa 2 (retry com delay)
+    Logger.log('Retry para foto ' + (index + 1) + ' na pasta ' + folderName);
+    Utilities.sleep(500);
+    res = tryUploadToDrive_(folder, base64Data, mimeType, fileName);
+    if (res && res.url) {
+      uploadedUrls.push(res.url);
+    } else {
+      currentErr = (res && res.error) ? res.error : currentErr;
+      Logger.log('FALHA DEFINITIVA foto ' + (index + 1) + ' na pasta ' + folderName + ': ' + currentErr);
+      failedCount++;
+      lastUploadError = currentErr;
+    }
+  });
+
+  return { urls: uploadedUrls, failedCount: failedCount, lastError: lastUploadError };
+}
+
+/**
+ * Tenta fazer upload de uma única foto ao Google Drive.
+ * Retorna { url: 'https://...', error: null } em caso de sucesso, ou { url: null, error: '...' } em caso de falha.
+ * Trata restrições de permissões da organização (compartilhamento externo restrito) de forma não-fatal.
+ */
+function tryUploadToDrive_(folder, base64Data, mimeType, fileName) {
+  try {
+    var bytes = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(bytes, mimeType, fileName);
+
+    // 1. Remover versão anterior com mesmo nome se existir (não abortar se falhar)
     try {
-      var matches = fotoItem.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-      if (!matches) {
-        uploadedUrls.push(fotoItem);
-        return;
-      }
-
-      var mimeType = matches[1];
-      var base64Data = matches[2];
-      var blob = Utilities.newBlob(
-        Utilities.base64Decode(base64Data),
-        mimeType,
-        idPrefix + '_' + fileTag + '_' + (index + 1) + '.' + (mimeType === 'image/png' ? 'png' : 'jpg')
-      );
-
-      var fileName = blob.getName();
       var existingFiles = folder.getFilesByName(fileName);
       while (existingFiles.hasNext()) {
         existingFiles.next().setTrashed(true);
       }
-
-      var file = folder.createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
-      var fileId = file.getId();
-      var directUrl = 'https://lh3.googleusercontent.com/d/' + fileId;
-      uploadedUrls.push(directUrl);
-    } catch (err) {
-      Logger.log('Erro ao salvar foto ' + (index + 1) + ' na pasta ' + folderName + ': ' + err.message);
-      uploadedUrls.push(fotoItem);
+    } catch (trashErr) {
+      Logger.log('Aviso ao remover versão anterior de ' + fileName + ': ' + trashErr.message);
     }
-  });
 
-  return uploadedUrls;
+    // 2. Criar o arquivo na pasta do Drive
+    var file = folder.createFile(blob);
+
+    // 3. Compartilhamento público (opcional: não abortar se a política da organização bloquear)
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      Logger.log('Aviso de compartilhamento para ' + fileName + ' (normal em contas restritas): ' + shareErr.message);
+    }
+
+    var fileId = file.getId();
+    return { url: 'https://lh3.googleusercontent.com/d/' + fileId, error: null };
+  } catch (err) {
+    Logger.log('tryUploadToDrive_ falhou para ' + fileName + ': ' + err.message);
+    return { url: null, error: err.message };
+  }
 }
 
 /**
@@ -938,7 +1014,11 @@ function getOrCreateDriveFolder_(folderName) {
   }
 
   var folder = DriveApp.createFolder(targetName);
-  folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  try {
+    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (e) {
+    Logger.log('Aviso ao definir permissão na pasta: ' + e.message);
+  }
   return folder;
 }
 
